@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package erspan_hub.pcap.v1;
+option go_package = "anthonyuk.dev/erspan-hub/generated/pcap/v1;pcapv1";
+
+
+// The client sends this message to start the packet stream
+message ForwardRequest {
+    string src_ip = 1; // Source IP address
+    uint32 erspan_id = 2; // ERSPAN ID
+    string stream_info_id = 3; // Stream information ID
+    string filter = 4; // Filter for the stream
+}
+
+
+// The server streams back multiple messages of this type.
+message Packet {
+    int64 timestamp = 1; // Packet timestamp (Unix time in nanoseconds)
+    bytes raw_data = 2;
+}
+
+// The service definition for the streaming API.
+service PcapForwarder {
+    rpc ForwardStream (ForwardRequest) returns (stream Packet);
+}

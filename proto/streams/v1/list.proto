@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package erspan_hub.streams.v1;
+option go_package = "anthonyuk.dev/erspan-hub/generated/streams/v1;streams_v1";
+
+message ForwardSession {
+  fixed32 src_ip = 1;
+  uint32 erspan_id = 2;
+  string stream_info_id = 3;
+  string type = 4;
+  string filter = 5;
+  reserved 7 to 15;
+  map<string, string> info = 16;
+}
+
+message StreamInfo {
+  string id = 1;
+  fixed32 src_ip = 2;
+  uint32 erspan_id = 3;
+  uint32 erspan_version = 4;
+  int64 first_seen = 5; // Unix timestamp
+  int64 last_seen = 6;  // Unix timestamp
+  uint64 packets = 7;
+  uint64 bytes = 8;
+  reserved 9 to 15;
+  repeated ForwardSession forward_sessions = 16;
+}
+
+message ListStreamsRequest {}
+
+message ListStreamsResponse {
+  repeated StreamInfo streams = 1;
+}
+
+service StreamsService {
+  rpc ListStreams(ListStreamsRequest) returns (ListStreamsResponse);
+}
