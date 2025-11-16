@@ -10,10 +10,9 @@ import (
 )
 
 type ForwardSessionManager struct {
-	logger   *slog.Logger
-	mu       sync.RWMutex
-	Streams  map[StreamKey]*StreamInfo
-	Sessions ForwardSessionSet
+	logger  *slog.Logger
+	mu      sync.RWMutex
+	Streams map[StreamKey]*StreamInfo
 }
 
 type ForwardSessionFactory func(fsm *ForwardSessionManager, key StreamKey, streamID string, handlerType string, filter string, cfg map[string]any) (fs ForwardSessionChannel, err error)
@@ -44,10 +43,9 @@ func (fsm *ForwardSessionManager) RUnlock() {
 // NewForwardSessionManager creates a new ForwardSessionManager
 func NewForwardSessionManager(logger *slog.Logger) *ForwardSessionManager {
 	return &ForwardSessionManager{
-		logger:   logger,
-		mu:       sync.RWMutex{},
-		Streams:  make(map[StreamKey]*StreamInfo),
-		Sessions: make(ForwardSessionSet),
+		logger:  logger,
+		mu:      sync.RWMutex{},
+		Streams: make(map[StreamKey]*StreamInfo),
 	}
 }
 

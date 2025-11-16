@@ -12,6 +12,7 @@ import (
 
 	pcap_v1 "anthonyuk.dev/erspan-hub/generated/pcap/v1"
 	streams_v1 "anthonyuk.dev/erspan-hub/generated/streams/v1"
+	"anthonyuk.dev/erspan-hub/internal"
 	"anthonyuk.dev/erspan-hub/internal/forward"
 	"google.golang.org/grpc"
 )
@@ -39,6 +40,7 @@ func RunServer(cfg *Config, fsm *forward.ForwardSessionManager) error {
 
 	streams_v1.RegisterStreamsServiceServer(s, &StreamsServiceServer{gsvr: gsvr})
 	pcap_v1.RegisterPcapForwarderServer(s, &PcapForwarderServer{gsvr: gsvr})
+	pcap_v1.RegisterValidateFilterServiceServer(s, &ValidateFilterServer{gsvr: gsvr})
 
 	// start server
 	go func() {
@@ -53,11 +55,12 @@ func RunServer(cfg *Config, fsm *forward.ForwardSessionManager) error {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	gsvr.logger.Info("🛑 Shutting down gRPC server due to signal…")
+	fsm.CloseAllForwardSessions(internal.ForwardSessionMsgTypeShutdown)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	s.GracefulStop()
 	defer cancel()
 	<-ctx.Done()
-	s.Stop()
+	s.GracefulStop()
+	//s.Stop()
 	return nil
 }
 

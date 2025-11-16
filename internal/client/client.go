@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"log/slog"
+	"os"
 	"time"
 
 	pcap_v1 "anthonyuk.dev/erspan-hub/generated/pcap/v1"
@@ -17,11 +18,12 @@ type Config struct {
 }
 
 type Client struct {
-	Config  *Config
-	Logger  *slog.Logger
-	conn    *grpc.ClientConn
-	streams streams_v1.StreamsServiceClient
-	pcap    pcap_v1.PcapForwarderClient
+	Config               *Config
+	Logger               *slog.Logger
+	Conn                 *grpc.ClientConn
+	StreamsClient        streams_v1.StreamsServiceClient
+	PcapClient           pcap_v1.PcapForwarderClient
+	ValidateFilterClient pcap_v1.ValidateFilterServiceClient
 }
 
 func NewClient(cfg *Config, logger *slog.Logger) (*Client, error) {
@@ -31,24 +33,34 @@ func NewClient(cfg *Config, logger *slog.Logger) (*Client, error) {
 		return nil, err
 	}
 	client := &Client{
-		Config:  cfg,
-		Logger:  logger,
-		conn:    conn,
-		streams: streams_v1.NewStreamsServiceClient(conn),
-		pcap:    pcap_v1.NewPcapForwarderClient(conn),
+		Config:               cfg,
+		Logger:               logger,
+		Conn:                 conn,
+		StreamsClient:        streams_v1.NewStreamsServiceClient(conn),
+		PcapClient:           pcap_v1.NewPcapForwarderClient(conn),
+		ValidateFilterClient: pcap_v1.NewValidateFilterServiceClient(conn),
 	}
 	return client, nil
 }
 
-func (c *Client) Close() {
-	if c.conn != nil {
-		c.conn.Close()
+func NewClientOrExit(cfg *Config, logger *slog.Logger) *Client {
+	client, err := NewClient(cfg, logger)
+	if err != nil {
+		logger.Error("failed to create client", "error", err)
+		os.Exit(1)
 	}
-	c.conn = nil
+	return client
+}
+
+func (c *Client) Close() {
+	if c.Conn != nil {
+		c.Conn.Close()
+	}
+	c.Conn = nil
 }
 
 func (c *Client) ListStreams(ctx context.Context) (streams []*StreamInfo, err error) {
-	resp, err := c.streams.ListStreams(ctx, &streams_v1.ListStreamsRequest{})
+	resp, err := c.StreamsClient.ListStreams(ctx, &streams_v1.ListStreamsRequest{})
 	if err != nil {
 		c.Logger.Error("could not list streams", "error", err)
 		return nil, err
@@ -80,4 +92,16 @@ func (c *Client) ListStreams(ctx context.Context) (streams []*StreamInfo, err er
 		streams = append(streams, &sinfo)
 	}
 	return streams, nil
+}
+
+func (c *Client) ValidateFilter(ctx context.Context, filter string) (valid bool, errMsg string, bpf []*pcap_v1.BPFInstruction, err error) {
+	var resp *pcap_v1.ValidateFilterResponse
+	resp, err = c.ValidateFilterClient.ValidateFilter(ctx, &pcap_v1.ValidateFilterRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		c.Logger.Error("could not validate filter", "error", err)
+		return false, "", nil, err
+	}
+	return resp.Valid, resp.ErrorMessage, resp.Bpf, nil
 }

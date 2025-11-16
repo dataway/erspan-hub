@@ -17,6 +17,13 @@ import (
 	"anthonyuk.dev/erspan-hub/internal/rest"
 )
 
+// Override these variables at build time using -ldflags
+var (
+	Version = "dev"
+	Commit  = "unknown"
+	Date    = "unknown"
+)
+
 func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {

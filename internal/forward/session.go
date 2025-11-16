@@ -2,7 +2,10 @@ package forward
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
+	"anthonyuk.dev/erspan-hub/internal"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 )
@@ -68,7 +71,7 @@ func (fsm *ForwardSessionManager) createForwardSessionImpl(key StreamKey, stream
 	defer fsm.Unlock()
 	si.ForwardSessions[fs] = struct{}{}
 	fsm.Streams[fs.GetStreamKey()] = si
-	fsm.logger.Info("Created new forward session", "stream_id", si.ID, "type", handlerType, "fs", fs)
+	fsm.logger.Debug("Created new forward session", "stream_id", si.ID, "type", handlerType, "fs", fs)
 	return fs, nil
 }
 
@@ -79,10 +82,41 @@ func (fsm *ForwardSessionManager) DeleteForwardSession(fs ForwardSessionChannel)
 	if exists {
 		delete(si.ForwardSessions, fs)
 	}
-	// Remove from the global session set
-	delete(fsm.Sessions, fs)
 	fsm.Unlock()
 	// Close the channel to signal the receiver to stop
 	close(fs.GetChannel())
-	fsm.logger.Info("Deleted forward session", "stream_id", si.ID, "fs", fs)
+	fsm.logger.Debug("Deleted forward session", "stream_id", si.ID, "fs", fs)
+}
+
+func (fsm *ForwardSessionManager) GetAllForwardSessions() ForwardSessionSet {
+	fsm.RLock()
+	defer fsm.RUnlock()
+	sessions := make(ForwardSessionSet)
+	for _, si := range fsm.Streams {
+		for fs := range si.ForwardSessions {
+			sessions[fs] = struct{}{}
+		}
+	}
+	return sessions
+}
+
+func (fsm *ForwardSessionManager) CloseAllForwardSessions(msgType internal.ForwardSessionMsgType) {
+	sessions := fsm.GetAllForwardSessions()
+	wg := sync.WaitGroup{}
+	msg := ForwardSessionMsg{
+		Type: msgType,
+	}
+
+	for sess := range sessions {
+		wg.Add(1)
+		go func(ch chan ForwardSessionMsg) {
+			defer wg.Done()
+			select {
+			case ch <- msg:
+			case <-time.After(1000 * time.Millisecond):
+				fsm.logger.Warn("Timeout sending close message to forward session", "fs", sess)
+			}
+		}(sess.(ForwardSessionChannel).GetChannel())
+	}
+	wg.Wait()
 }

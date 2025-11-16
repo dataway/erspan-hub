@@ -1,12 +1,15 @@
 package grpc
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	pcap_v1 "anthonyuk.dev/erspan-hub/generated/pcap/v1"
 	"anthonyuk.dev/erspan-hub/internal"
 	"anthonyuk.dev/erspan-hub/internal/forward"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
 	"google.golang.org/grpc/peer"
 )
 
@@ -23,11 +26,16 @@ func (fs *ForwardSessionGrpc) GetInfo() map[string]string {
 		info["peer_addr"] = fs.peer.Addr.String()
 		info["local_addr"] = fs.peer.LocalAddr.String()
 	}
+	fmt.Printf("ForwardSessionGrpc GetInfo: %+v\n", info)
 	return info
 }
 
+func (fs *ForwardSessionGrpc) MarshalJSON() ([]byte, error) {
+	return forward.MarshalJSONIntf(fs)
+}
+
 func NewForwardSessionGrpc(fsm *forward.ForwardSessionManager, key forward.StreamKey, streamID string, handlerType string, filter string, cfg map[string]any) (fs forward.ForwardSessionChannel, err error) {
-	fsm.Logger().Info("gRPC forward session requested", "forward_session_manager", fsm, "config", cfg)
+	fsm.Logger().Info("gRPC forward session requested", "config", cfg)
 
 	fsb, err := forward.NewForwardSessionBase(fsm, key, streamID, handlerType, filter, cfg)
 	if err != nil {
@@ -72,7 +80,7 @@ func (s *PcapForwarderServer) ForwardStream(req *pcap_v1.ForwardRequest, svr pca
 	streamInfoID := req.GetStreamInfoId()
 	filter := req.GetFilter()
 
-	s.gsvr.logger.InfoContext(ctx, "Received ForwardStream request", "src_ip", srcIP, "erspan_id", erspanID, "stream_info_id", streamInfoID, "filter", filter)
+	s.gsvr.logger.DebugContext(ctx, "Received ForwardStream request", "src_ip", srcIP, "erspan_id", erspanID, "stream_info_id", streamInfoID, "filter", filter)
 	cfg := make(map[string]any)
 	if p, ok := peer.FromContext(ctx); ok {
 		cfg["peer"] = p
@@ -90,7 +98,6 @@ func (s *PcapForwarderServer) ForwardStream(req *pcap_v1.ForwardRequest, svr pca
 	defer s.gsvr.fsm.DeleteForwardSession(fs)
 	ch := fs.GetChannel()
 
-	s.gsvr.logger.InfoContext(ctx, "Started gRPC forwarding for stream", "stream_info_id", streamInfoID, "channel", fmt.Sprintf("%+v", ch))
 	pfw := &PcapForwarderWriter{svr: svr}
 	pcapw, err := forward.NewPcapNgWriter(pfw, fs)
 	if err != nil {
@@ -102,19 +109,66 @@ func (s *PcapForwarderServer) ForwardStream(req *pcap_v1.ForwardRequest, svr pca
 		select {
 		case msg, ok := <-ch:
 			if !ok {
-				s.gsvr.logger.InfoContext(ctx, "Forward session channel closed, ending gRPC forwarding", "stream_info_id", streamInfoID)
+				s.gsvr.logger.DebugContext(ctx, "Forward session channel closed, ending gRPC forwarding", "stream_info_id", streamInfoID)
 				return nil
 			}
-			if msg.Type == internal.ForwardSessionMsgTypePacket {
+			switch msg.Type {
+			case internal.ForwardSessionMsgTypePacket:
 				if err := pcapw.WritePacket(msg.Packet, msg.Time); err != nil {
 					s.gsvr.logger.ErrorContext(ctx, "Failed to write packet via gRPC", "error", err)
 				}
+
+			case internal.ForwardSessionMsgTypeClose:
+				pcapw.NgWriter.Flush()
+				svr.Send(&pcap_v1.Packet{
+					Timestamp: -1,
+					RawData:   nil,
+				})
+				return nil
+
+			case internal.ForwardSessionMsgTypeShutdown:
+				pcapw.NgWriter.Flush()
+				svr.Send(&pcap_v1.Packet{
+					Timestamp: -2,
+					RawData:   nil,
+				})
+				return nil
 			}
 		case <-ctx.Done():
-			s.gsvr.logger.InfoContext(ctx, "gRPC client context done, ending gRPC forwarding", "stream_info_id", streamInfoID)
+			s.gsvr.logger.DebugContext(ctx, "gRPC client context done, ending gRPC forwarding", "stream_info_id", streamInfoID)
 			return nil
 		}
 	}
+}
+
+type ValidateFilterServer struct {
+	gsvr *GrpcServer
+	pcap_v1.UnimplementedValidateFilterServiceServer
+}
+
+func (s *ValidateFilterServer) ValidateFilter(ctx context.Context, req *pcap_v1.ValidateFilterRequest) (*pcap_v1.ValidateFilterResponse, error) {
+	filter := req.GetFilter()
+	s.gsvr.logger.DebugContext(ctx, "Received ValidateFilter request", "filter", filter)
+
+	resp := &pcap_v1.ValidateFilterResponse{}
+
+	bpf, err := pcap.CompileBPFFilter(layers.LinkTypeEthernet, 65535, filter)
+	if err == nil {
+		resp.Valid = true
+		resp.Bpf = make([]*pcap_v1.BPFInstruction, len(bpf))
+		for i, ins := range bpf {
+			resp.Bpf[i] = &pcap_v1.BPFInstruction{
+				Code: uint32(ins.Code),
+				Jt:   uint32(ins.Jt),
+				Jf:   uint32(ins.Jf),
+				K:    ins.K,
+			}
+		}
+	} else {
+		resp.Valid = false
+		resp.ErrorMessage = fmt.Sprintf("%v", err)
+	}
+	return resp, nil
 }
 
 func init() {

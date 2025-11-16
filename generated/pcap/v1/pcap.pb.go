@@ -4,7 +4,7 @@
 // 	protoc        v6.32.1
 // source: pcap/v1/pcap.proto
 
-package pcapv1
+package pcap_v1
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -93,7 +93,7 @@ func (x *ForwardRequest) GetFilter() string {
 // The server streams back multiple messages of this type.
 type Packet struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Timestamp     int64                  `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Packet timestamp (Unix time in nanoseconds)
+	Timestamp     int64                  `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Packet timestamp (Unix time in nanoseconds), or <0 for shutdown signal
 	RawData       []byte                 `protobuf:"bytes,2,opt,name=raw_data,json=rawData,proto3" json:"raw_data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -143,6 +143,178 @@ func (x *Packet) GetRawData() []byte {
 	return nil
 }
 
+type BPFInstruction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          uint32                 `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Jt            uint32                 `protobuf:"varint,2,opt,name=jt,proto3" json:"jt,omitempty"`
+	Jf            uint32                 `protobuf:"varint,3,opt,name=jf,proto3" json:"jf,omitempty"`
+	K             uint32                 `protobuf:"varint,4,opt,name=k,proto3" json:"k,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BPFInstruction) Reset() {
+	*x = BPFInstruction{}
+	mi := &file_pcap_v1_pcap_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BPFInstruction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BPFInstruction) ProtoMessage() {}
+
+func (x *BPFInstruction) ProtoReflect() protoreflect.Message {
+	mi := &file_pcap_v1_pcap_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BPFInstruction.ProtoReflect.Descriptor instead.
+func (*BPFInstruction) Descriptor() ([]byte, []int) {
+	return file_pcap_v1_pcap_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *BPFInstruction) GetCode() uint32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *BPFInstruction) GetJt() uint32 {
+	if x != nil {
+		return x.Jt
+	}
+	return 0
+}
+
+func (x *BPFInstruction) GetJf() uint32 {
+	if x != nil {
+		return x.Jf
+	}
+	return 0
+}
+
+func (x *BPFInstruction) GetK() uint32 {
+	if x != nil {
+		return x.K
+	}
+	return 0
+}
+
+type ValidateFilterRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Filter        string                 `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidateFilterRequest) Reset() {
+	*x = ValidateFilterRequest{}
+	mi := &file_pcap_v1_pcap_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateFilterRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateFilterRequest) ProtoMessage() {}
+
+func (x *ValidateFilterRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pcap_v1_pcap_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateFilterRequest.ProtoReflect.Descriptor instead.
+func (*ValidateFilterRequest) Descriptor() ([]byte, []int) {
+	return file_pcap_v1_pcap_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ValidateFilterRequest) GetFilter() string {
+	if x != nil {
+		return x.Filter
+	}
+	return ""
+}
+
+type ValidateFilterResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Valid         bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`                                  // True if the filter is valid
+	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"` // Empty if valid is true
+	Bpf           []*BPFInstruction      `protobuf:"bytes,3,rep,name=bpf,proto3" json:"bpf,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidateFilterResponse) Reset() {
+	*x = ValidateFilterResponse{}
+	mi := &file_pcap_v1_pcap_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateFilterResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateFilterResponse) ProtoMessage() {}
+
+func (x *ValidateFilterResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pcap_v1_pcap_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateFilterResponse.ProtoReflect.Descriptor instead.
+func (*ValidateFilterResponse) Descriptor() ([]byte, []int) {
+	return file_pcap_v1_pcap_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ValidateFilterResponse) GetValid() bool {
+	if x != nil {
+		return x.Valid
+	}
+	return false
+}
+
+func (x *ValidateFilterResponse) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *ValidateFilterResponse) GetBpf() []*BPFInstruction {
+	if x != nil {
+		return x.Bpf
+	}
+	return nil
+}
+
 var File_pcap_v1_pcap_proto protoreflect.FileDescriptor
 
 const file_pcap_v1_pcap_proto_rawDesc = "" +
@@ -155,9 +327,22 @@ const file_pcap_v1_pcap_proto_rawDesc = "" +
 	"\x06filter\x18\x04 \x01(\tR\x06filter\"A\n" +
 	"\x06Packet\x12\x1c\n" +
 	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12\x19\n" +
-	"\braw_data\x18\x02 \x01(\fR\arawData2b\n" +
+	"\braw_data\x18\x02 \x01(\fR\arawData\"R\n" +
+	"\x0eBPFInstruction\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\rR\x04code\x12\x0e\n" +
+	"\x02jt\x18\x02 \x01(\rR\x02jt\x12\x0e\n" +
+	"\x02jf\x18\x03 \x01(\rR\x02jf\x12\f\n" +
+	"\x01k\x18\x04 \x01(\rR\x01k\"/\n" +
+	"\x15ValidateFilterRequest\x12\x16\n" +
+	"\x06filter\x18\x01 \x01(\tR\x06filter\"\x89\x01\n" +
+	"\x16ValidateFilterResponse\x12\x14\n" +
+	"\x05valid\x18\x01 \x01(\bR\x05valid\x12#\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x124\n" +
+	"\x03bpf\x18\x03 \x03(\v2\".erspan_hub.pcap.v1.BPFInstructionR\x03bpf2b\n" +
 	"\rPcapForwarder\x12Q\n" +
-	"\rForwardStream\x12\".erspan_hub.pcap.v1.ForwardRequest\x1a\x1a.erspan_hub.pcap.v1.Packet0\x01B3Z1anthonyuk.dev/erspan-hub/generated/pcap/v1;pcapv1b\x06proto3"
+	"\rForwardStream\x12\".erspan_hub.pcap.v1.ForwardRequest\x1a\x1a.erspan_hub.pcap.v1.Packet0\x012\x80\x01\n" +
+	"\x15ValidateFilterService\x12g\n" +
+	"\x0eValidateFilter\x12).erspan_hub.pcap.v1.ValidateFilterRequest\x1a*.erspan_hub.pcap.v1.ValidateFilterResponseB4Z2anthonyuk.dev/erspan-hub/generated/pcap/v1;pcap_v1b\x06proto3"
 
 var (
 	file_pcap_v1_pcap_proto_rawDescOnce sync.Once
@@ -171,19 +356,25 @@ func file_pcap_v1_pcap_proto_rawDescGZIP() []byte {
 	return file_pcap_v1_pcap_proto_rawDescData
 }
 
-var file_pcap_v1_pcap_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_pcap_v1_pcap_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_pcap_v1_pcap_proto_goTypes = []any{
-	(*ForwardRequest)(nil), // 0: erspan_hub.pcap.v1.ForwardRequest
-	(*Packet)(nil),         // 1: erspan_hub.pcap.v1.Packet
+	(*ForwardRequest)(nil),         // 0: erspan_hub.pcap.v1.ForwardRequest
+	(*Packet)(nil),                 // 1: erspan_hub.pcap.v1.Packet
+	(*BPFInstruction)(nil),         // 2: erspan_hub.pcap.v1.BPFInstruction
+	(*ValidateFilterRequest)(nil),  // 3: erspan_hub.pcap.v1.ValidateFilterRequest
+	(*ValidateFilterResponse)(nil), // 4: erspan_hub.pcap.v1.ValidateFilterResponse
 }
 var file_pcap_v1_pcap_proto_depIdxs = []int32{
-	0, // 0: erspan_hub.pcap.v1.PcapForwarder.ForwardStream:input_type -> erspan_hub.pcap.v1.ForwardRequest
-	1, // 1: erspan_hub.pcap.v1.PcapForwarder.ForwardStream:output_type -> erspan_hub.pcap.v1.Packet
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	2, // 0: erspan_hub.pcap.v1.ValidateFilterResponse.bpf:type_name -> erspan_hub.pcap.v1.BPFInstruction
+	0, // 1: erspan_hub.pcap.v1.PcapForwarder.ForwardStream:input_type -> erspan_hub.pcap.v1.ForwardRequest
+	3, // 2: erspan_hub.pcap.v1.ValidateFilterService.ValidateFilter:input_type -> erspan_hub.pcap.v1.ValidateFilterRequest
+	1, // 3: erspan_hub.pcap.v1.PcapForwarder.ForwardStream:output_type -> erspan_hub.pcap.v1.Packet
+	4, // 4: erspan_hub.pcap.v1.ValidateFilterService.ValidateFilter:output_type -> erspan_hub.pcap.v1.ValidateFilterResponse
+	3, // [3:5] is the sub-list for method output_type
+	1, // [1:3] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_pcap_v1_pcap_proto_init() }
@@ -197,9 +388,9 @@ func file_pcap_v1_pcap_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pcap_v1_pcap_proto_rawDesc), len(file_pcap_v1_pcap_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   5,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_pcap_v1_pcap_proto_goTypes,
 		DependencyIndexes: file_pcap_v1_pcap_proto_depIdxs,

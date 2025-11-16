@@ -22,6 +22,10 @@ func (ip IPv4) ToUint32() uint32 {
 	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
 }
 
+func (ip IPv4) MarshalJSON() ([]byte, error) {
+	return json.Marshal(ip.String())
+}
+
 func IPFromUint32(u uint32) IPv4 {
 	return IPv4{
 		byte((u >> 24) & 0xFF),
@@ -83,6 +87,7 @@ type ForwardSessionMsgType uint
 const (
 	ForwardSessionMsgTypePacket ForwardSessionMsgType = iota
 	ForwardSessionMsgTypeClose
+	ForwardSessionMsgTypeShutdown
 )
 
 type ForwardSessionMsg struct {

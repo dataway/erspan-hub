@@ -56,18 +56,28 @@ func (fs *ForwardSessionBase) GetInfo() map[string]string {
 	return map[string]string{}
 }
 
-// MarshalJSON implements custom JSON marshalling for ForwardSession to include the filter string
-func (fs *ForwardSessionBase) MarshalJSON() ([]byte, error) {
-	type Alias ForwardSessionBase
-	var filterStr string
-	if fs.Filter != nil {
-		filterStr = fs.Filter.String()
-	}
-	return json.Marshal(&struct {
-		Filter string `json:"filter"`
-		*Alias
-	}{
-		Filter: filterStr,
-		Alias:  (*Alias)(fs),
+// forwardSessionInfo is used for JSON marshalling of ForwardSession
+
+type forwardSessionInfo struct {
+	StreamKey    StreamKey         `json:"stream_key"`
+	StreamInfoID string            `json:"stream_info_id"`
+	Type         string            `json:"type"`
+	Filter       string            `json:"filter"`
+	Info         map[string]string `json:"info,omitempty"`
+}
+
+func MarshalJSONIntf(fs internal.ForwardSession) ([]byte, error) {
+	return json.Marshal(forwardSessionInfo{
+		StreamKey:    fs.GetStreamKey(),
+		StreamInfoID: fs.GetStreamInfoID(),
+		Type:         fs.GetType(),
+		Filter:       fs.GetFilterString(),
+		Info:         fs.GetInfo(),
 	})
+}
+
+// This method is needed to satisfy the interface and must be implemented by all interfaces
+// derived from ForwardSessionBase to ensure overrides are correctly called.
+func (fs *ForwardSessionBase) MarshalJSON() ([]byte, error) {
+	return MarshalJSONIntf(fs)
 }

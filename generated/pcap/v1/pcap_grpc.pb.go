@@ -4,7 +4,7 @@
 // - protoc             v6.32.1
 // source: pcap/v1/pcap.proto
 
-package pcapv1
+package pcap_v1
 
 import (
 	context "context"
@@ -124,5 +124,107 @@ var PcapForwarder_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
+	Metadata: "pcap/v1/pcap.proto",
+}
+
+const (
+	ValidateFilterService_ValidateFilter_FullMethodName = "/erspan_hub.pcap.v1.ValidateFilterService/ValidateFilter"
+)
+
+// ValidateFilterServiceClient is the client API for ValidateFilterService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type ValidateFilterServiceClient interface {
+	ValidateFilter(ctx context.Context, in *ValidateFilterRequest, opts ...grpc.CallOption) (*ValidateFilterResponse, error)
+}
+
+type validateFilterServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewValidateFilterServiceClient(cc grpc.ClientConnInterface) ValidateFilterServiceClient {
+	return &validateFilterServiceClient{cc}
+}
+
+func (c *validateFilterServiceClient) ValidateFilter(ctx context.Context, in *ValidateFilterRequest, opts ...grpc.CallOption) (*ValidateFilterResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ValidateFilterResponse)
+	err := c.cc.Invoke(ctx, ValidateFilterService_ValidateFilter_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ValidateFilterServiceServer is the server API for ValidateFilterService service.
+// All implementations must embed UnimplementedValidateFilterServiceServer
+// for forward compatibility.
+type ValidateFilterServiceServer interface {
+	ValidateFilter(context.Context, *ValidateFilterRequest) (*ValidateFilterResponse, error)
+	mustEmbedUnimplementedValidateFilterServiceServer()
+}
+
+// UnimplementedValidateFilterServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedValidateFilterServiceServer struct{}
+
+func (UnimplementedValidateFilterServiceServer) ValidateFilter(context.Context, *ValidateFilterRequest) (*ValidateFilterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ValidateFilter not implemented")
+}
+func (UnimplementedValidateFilterServiceServer) mustEmbedUnimplementedValidateFilterServiceServer() {}
+func (UnimplementedValidateFilterServiceServer) testEmbeddedByValue()                               {}
+
+// UnsafeValidateFilterServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ValidateFilterServiceServer will
+// result in compilation errors.
+type UnsafeValidateFilterServiceServer interface {
+	mustEmbedUnimplementedValidateFilterServiceServer()
+}
+
+func RegisterValidateFilterServiceServer(s grpc.ServiceRegistrar, srv ValidateFilterServiceServer) {
+	// If the following call pancis, it indicates UnimplementedValidateFilterServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&ValidateFilterService_ServiceDesc, srv)
+}
+
+func _ValidateFilterService_ValidateFilter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidateFilterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ValidateFilterServiceServer).ValidateFilter(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ValidateFilterService_ValidateFilter_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ValidateFilterServiceServer).ValidateFilter(ctx, req.(*ValidateFilterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ValidateFilterService_ServiceDesc is the grpc.ServiceDesc for ValidateFilterService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ValidateFilterService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "erspan_hub.pcap.v1.ValidateFilterService",
+	HandlerType: (*ValidateFilterServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ValidateFilter",
+			Handler:    _ValidateFilterService_ValidateFilter_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "pcap/v1/pcap.proto",
 }
