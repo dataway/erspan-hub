@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"anthonyuk.dev/erspan-hub/internal"
+
 	"github.com/google/gopacket"
 )
 
@@ -27,7 +28,9 @@ func (fsm *ForwardSessionManager) ForwardToSessions(si *StreamInfo, timestamp ti
 	gci := gopacket.CaptureInfo{Timestamp: timestamp, CaptureLength: len(payload), Length: len(payload)}
 	for sess := range si.ForwardSessions {
 		schan := sess.(ForwardSessionChannel)
+		schan.GetStats().TotalPackets.Add(1)
 		if schan.GetBpfFilter() != nil && !schan.GetBpfFilter().Matches(gci, payload) {
+			schan.GetStats().FilteredPackets.Add(1)
 			continue
 		}
 		channels = append(channels, schan.GetChannel())

@@ -11,17 +11,19 @@ type ExtcapControlPkt struct {
 	Payload []byte
 }
 
-func ExtcapControlReceiver(cfg *Config, logger *slog.Logger) (ch chan ExtcapControlPkt, err error) {
+func ExtcapControlReceiver(cfg *Config, logger *slog.Logger) (ch chan ExtcapControlPkt) {
 	if cfg.ExtcapControlIn == "" {
-		return nil, nil
+		return nil
 	}
 	ch = make(chan ExtcapControlPkt, 2)
-	fd, err := os.OpenFile(cfg.ExtcapControlIn, os.O_RDONLY, 0)
-	if err != nil {
-		logger.Error("failed to open extcap control in", "file", cfg.ExtcapControlIn, "error", err)
-		return nil, err
-	}
 	go func() {
+		logger.Debug("Opening extcap fifo", "extcap_control_in", cfg.ExtcapControlIn)
+		fd, err := os.OpenFile(cfg.ExtcapControlIn, os.O_RDONLY, 0)
+		if err != nil {
+			logger.Error("failed to open extcap control in", "file", cfg.ExtcapControlIn, "error", err)
+			return
+		}
+		logger.Debug("Opened extcap fifo", "extcap_control_in", cfg.ExtcapControlIn)
 		defer fd.Close()
 		defer close(ch)
 		for {
@@ -55,7 +57,7 @@ func ExtcapControlReceiver(cfg *Config, logger *slog.Logger) (ch chan ExtcapCont
 			ch <- ctrlPkt
 		}
 	}()
-	return ch, nil
+	return ch
 }
 
 func ExtcapControlSend(fd *os.File, pkt ExtcapControlPkt) error {

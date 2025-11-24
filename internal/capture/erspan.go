@@ -8,6 +8,7 @@ import (
 
 	"anthonyuk.dev/erspan-hub/internal"
 	"anthonyuk.dev/erspan-hub/internal/forward"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/prometheus/client_golang/prometheus"

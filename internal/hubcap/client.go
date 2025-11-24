@@ -35,16 +35,13 @@ func ListStreams(cfg *Config, logger *slog.Logger) (streams []*client.StreamInfo
 func ValidateFilter(cfg *Config, logger *slog.Logger) (valid bool, errMsg string, bpf []*pcap_v1.BPFInstruction, err error) {
 	cl, ctx, err1 := NewClient(cfg, logger)
 	if err1 != nil {
-		logger.Error("Failed to create gRPC client", "error", err1)
 		return false, "", nil, err1
 	}
 	valid, errMsg, bpf, err = cl.ValidateFilter(ctx, cfg.Filter)
 	if err != nil {
-		logger.Error("Failed to validate filter", "error", err)
 		return false, "", nil, err
 	}
 	if !valid {
-		logger.Error("Filter is invalid", "error_message", errMsg)
 		return false, errMsg, nil, nil
 	}
 	return true, "", bpf, nil

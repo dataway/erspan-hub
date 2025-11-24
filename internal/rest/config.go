@@ -1,5 +1,6 @@
 package rest
 
 type Config struct {
-	Port uint16
+	BindIP string
+	Port   uint16
 }

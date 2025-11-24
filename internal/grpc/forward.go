@@ -3,11 +3,14 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	pcap_v1 "anthonyuk.dev/erspan-hub/generated/pcap/v1"
 	"anthonyuk.dev/erspan-hub/internal"
 	"anthonyuk.dev/erspan-hub/internal/forward"
+
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	"google.golang.org/grpc/peer"
@@ -15,7 +18,8 @@ import (
 
 type ForwardSessionGrpc struct {
 	forward.ForwardSessionBase
-	peer *peer.Peer
+	peer       *peer.Peer
+	clientInfo *map[string]string
 }
 
 func (fs *ForwardSessionGrpc) GetInfo() map[string]string {
@@ -26,7 +30,11 @@ func (fs *ForwardSessionGrpc) GetInfo() map[string]string {
 		info["peer_addr"] = fs.peer.Addr.String()
 		info["local_addr"] = fs.peer.LocalAddr.String()
 	}
-	fmt.Printf("ForwardSessionGrpc GetInfo: %+v\n", info)
+	if fs.clientInfo != nil {
+		for k, v := range *fs.clientInfo {
+			info[k] = v
+		}
+	}
 	return info
 }
 
@@ -49,6 +57,11 @@ func NewForwardSessionGrpc(fsm *forward.ForwardSessionManager, key forward.Strea
 			fs_grpc.peer = pr
 		}
 	}
+	if ci, ok := cfg["client_info"]; ok {
+		if cinfo, ok := ci.(map[string]string); ok {
+			fs_grpc.clientInfo = &cinfo
+		}
+	}
 	return fs_grpc, nil
 }
 
@@ -58,13 +71,15 @@ type PcapForwarderServer struct {
 }
 
 type PcapForwarderWriter struct {
-	svr pcap_v1.PcapForwarder_ForwardStreamServer
+	svr   pcap_v1.PcapForwarder_ForwardStreamServer
+	count atomic.Uint32
 }
 
 func (w *PcapForwarderWriter) Write(p []byte) (n int, err error) {
-	err = w.svr.Send(&pcap_v1.Packet{
-		Timestamp: time.Now().UnixNano(),
-		RawData:   p,
+	err = w.svr.Send(&pcap_v1.PacketBlock{
+		Timestamp:   time.Now().UnixNano(),
+		PacketCount: w.count.Swap(0),
+		RawData:     p,
 	})
 	if err != nil {
 		return 0, err
@@ -74,19 +89,20 @@ func (w *PcapForwarderWriter) Write(p []byte) (n int, err error) {
 
 func (s *PcapForwarderServer) ForwardStream(req *pcap_v1.ForwardRequest, svr pcap_v1.PcapForwarder_ForwardStreamServer) error {
 	ctx := svr.Context()
+	mu := &sync.Mutex{}
 
-	srcIP := req.GetSrcIp()
-	erspanID := uint16(req.GetErspanId())
 	streamInfoID := req.GetStreamInfoId()
 	filter := req.GetFilter()
 
-	s.gsvr.logger.DebugContext(ctx, "Received ForwardStream request", "src_ip", srcIP, "erspan_id", erspanID, "stream_info_id", streamInfoID, "filter", filter)
+	//Too much logging even for debug...
+	//s.gsvr.logger.DebugContext(ctx, "Received ForwardStream request", "src_ip", req.GetSrcIp(), "erspan_id", req.GetErspanId(), "stream_info_id", streamInfoID, "filter", filter)
 	cfg := make(map[string]any)
+	cfg["client_info"] = req.GetClientInfo()
 	if p, ok := peer.FromContext(ctx); ok {
 		cfg["peer"] = p
 	}
 
-	fs, err := s.gsvr.fsm.CreateForwardSessionByStreamInfoID(
+	fs_, err := s.gsvr.fsm.CreateForwardSessionByStreamInfoID(
 		streamInfoID,
 		"grpc_pcap", filter,
 		cfg,
@@ -95,6 +111,7 @@ func (s *PcapForwarderServer) ForwardStream(req *pcap_v1.ForwardRequest, svr pca
 		s.gsvr.logger.ErrorContext(ctx, "Failed to create forward session", "error", err)
 		return err
 	}
+	fs := fs_.(*ForwardSessionGrpc)
 	defer s.gsvr.fsm.DeleteForwardSession(fs)
 	ch := fs.GetChannel()
 
@@ -105,6 +122,27 @@ func (s *PcapForwarderServer) ForwardStream(req *pcap_v1.ForwardRequest, svr pca
 		return err
 	}
 	defer pcapw.NgWriter.Flush()
+
+	// Run a goroutine to flush pcapng writer periodically
+	ticker := time.NewTicker(200 * time.Millisecond)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				mu.Lock()
+				pcapw.NgWriter.Flush()
+				mu.Unlock()
+			case <-ctx.Done():
+				ticker.Stop()
+				mu.Lock()
+				pcapw.NgWriter.Flush()
+				mu.Unlock()
+				return
+			}
+		}
+	}()
+
+	// Main loop to forward packets from channel to gRPC stream
 	for {
 		select {
 		case msg, ok := <-ch:
@@ -114,13 +152,18 @@ func (s *PcapForwarderServer) ForwardStream(req *pcap_v1.ForwardRequest, svr pca
 			}
 			switch msg.Type {
 			case internal.ForwardSessionMsgTypePacket:
+				mu.Lock()
 				if err := pcapw.WritePacket(msg.Packet, msg.Time); err != nil {
 					s.gsvr.logger.ErrorContext(ctx, "Failed to write packet via gRPC", "error", err)
+					mu.Unlock()
+					return err
 				}
+				pfw.count.Add(1)
+				mu.Unlock()
 
 			case internal.ForwardSessionMsgTypeClose:
 				pcapw.NgWriter.Flush()
-				svr.Send(&pcap_v1.Packet{
+				svr.Send(&pcap_v1.PacketBlock{
 					Timestamp: -1,
 					RawData:   nil,
 				})
@@ -128,7 +171,7 @@ func (s *PcapForwarderServer) ForwardStream(req *pcap_v1.ForwardRequest, svr pca
 
 			case internal.ForwardSessionMsgTypeShutdown:
 				pcapw.NgWriter.Flush()
-				svr.Send(&pcap_v1.Packet{
+				svr.Send(&pcap_v1.PacketBlock{
 					Timestamp: -2,
 					RawData:   nil,
 				})

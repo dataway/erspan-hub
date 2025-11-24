@@ -3,8 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/user"
+	"runtime"
+	"runtime/debug"
 
 	"anthonyuk.dev/erspan-hub/internal/hubcap"
+
 	"github.com/spf13/pflag"
 )
 
@@ -40,6 +44,10 @@ func main() {
 		fmt.Printf("Version=%s\n", Version)
 		fmt.Printf("Commit=%s\n", Commit)
 		fmt.Printf("Date=%s\n", Date)
+		buildInfo, ok := debug.ReadBuildInfo()
+		if ok {
+			fmt.Printf("buildinf: %+v\n", buildInfo)
+		}
 		os.Exit(0)
 	}
 
@@ -68,7 +76,11 @@ func main() {
 			os.Exit(1)
 		}
 		if !valid {
-			logger.Error("Filter is invalid", "error", errMsg)
+			fmt.Printf("Filter is not valid: %s\n", errMsg)
+			if cfg.ExtcapInterface != "" {
+				// Wireshark expects a return value of 0
+				os.Exit(0)
+			}
 			os.Exit(1)
 		}
 		if cfg.BpfDumpType > 0 {
@@ -93,32 +105,30 @@ func main() {
 			for _, instr := range bpf {
 				fmt.Printf(format, instr.Code, instr.Jt, instr.Jf, instr.K)
 			}
-		} else {
+		} else if cfg.ExtcapInterface == "" {
+			// Wireshark expects empty output on stdout if the filter is valid
 			fmt.Printf("Filter is valid, %d BPF instructions\n", len(bpf))
 		}
 		os.Exit(0)
 	}
 
-	if cfg.ExtcapControlIn != "" {
-		ch, err := hubcap.ExtcapControlReceiver(cfg, logger)
-		if err != nil {
-			os.Exit(1)
-		}
-		if ch != nil {
-			go func() {
-				for pkt := range ch {
-					logger.Info("Extcap control packet received", "ctrl", pkt.Ctrl, "cmd", pkt.Cmd, "payload", string(pkt.Payload))
-				}
-			}()
-		}
+	clientInfo := map[string]string{
+		"client":         "hubcap",
+		"hubcap_version": Version,
+		"hubcap_commit":  Commit,
+		"hubcap_date":    Date,
+		"go_arch":        runtime.GOARCH,
+		"go_version":     runtime.Version(),
+		"go_compiler":    runtime.Compiler,
+		"os":             runtime.GOOS,
+		"hostname":       func() string { h, _ := os.Hostname(); return h }(),
 	}
-	if cfg.ExtcapControlOut != "" {
-		fd, err := os.OpenFile(cfg.ExtcapControlOut, os.O_WRONLY, 0)
-		if err != nil {
-			logger.Error("failed to open extcap control out", "file", cfg.ExtcapControlOut, "error", err)
-			os.Exit(1)
-		}
-		defer fd.Close()
+	user, err := user.Current()
+	if err == nil {
+		clientInfo["user"] = user.Username
+		clientInfo["uid"] = user.Uid
+		clientInfo["gid"] = user.Gid
+		clientInfo["user_description"] = user.Name
 	}
 
 	if cfg.Capture {
@@ -126,13 +136,20 @@ func main() {
 			logger.Error("--fifo is required when capturing")
 			os.Exit(1)
 		}
-		hubcap.RunCapture(cfg, logger)
+		err = hubcap.RunCapture(cfg, logger, clientInfo)
+		if err != nil {
+			os.Exit(1)
+		}
 		os.Exit(0)
 	} else if cfg.TestCapture {
 		if cfg.Fifo == "" {
 			cfg.Fifo = "/dev/null"
 		}
-		hubcap.RunCapture(cfg, logger)
+		clientInfo["test_capture"] = "true"
+		err = hubcap.RunCapture(cfg, logger, clientInfo)
+		if err != nil {
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 

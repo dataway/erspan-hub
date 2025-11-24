@@ -14,8 +14,10 @@ import (
 
 	"anthonyuk.dev/erspan-hub/internal"
 	"anthonyuk.dev/erspan-hub/internal/forward"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/httplog/v3"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -25,17 +27,12 @@ type RestServer struct {
 	fsm    *forward.ForwardSessionManager
 }
 
-// RunServer will start an HTTP server on the given port
-// and wire in a /lookup POST endpoint that (for now)
-// just logs the incoming parameters.
 func RunServer(cfg *Config, fsm *forward.ForwardSessionManager) error {
 
 	r := chi.NewRouter()
-	//r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(15 * time.Second))
+	r.Use(httplog.RequestLogger(fsm.Logger(), &httplog.Options{}))
 
 	rsvr := &RestServer{
 		logger: fsm.Logger(),
@@ -43,7 +40,11 @@ func RunServer(cfg *Config, fsm *forward.ForwardSessionManager) error {
 		fsm:    fsm,
 	}
 
+	setupStatic(r)
+
+	// API routes
 	r.Get("/streams", rsvr.listStreamsHandler)
+	r.Get("/streams/sse", rsvr.listStreamsSseHandler)
 	r.Post("/forward", rsvr.createForwardSessionHandler)
 	r.Handle("/metrics", promhttp.Handler())
 	r.HandleFunc("/debug/pprof/", pprof.Index)
@@ -59,8 +60,11 @@ func RunServer(cfg *Config, fsm *forward.ForwardSessionManager) error {
 	r.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.Port),
-		Handler: r,
+		Addr:         fmt.Sprintf("%s:%d", cfg.BindIP, cfg.Port),
+		Handler:      r,
+		WriteTimeout: 0, // disable timeout for SSE
+		ReadTimeout:  3600 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	// start server
@@ -79,20 +83,6 @@ func RunServer(cfg *Config, fsm *forward.ForwardSessionManager) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(ctx)
-}
-
-func (rsvr *RestServer) listStreamsHandler(w http.ResponseWriter, r *http.Request) {
-	rsvr.fsm.RLock()
-	defer rsvr.fsm.RUnlock()
-	type out struct {
-		ID         string              `json:"id"`
-		StreamInfo *forward.StreamInfo `json:"stream_info"`
-	}
-	var list []out
-	for k := range rsvr.fsm.Streams {
-		list = append(list, out{k.String(), rsvr.fsm.Streams[k]})
-	}
-	json.NewEncoder(w).Encode(list)
 }
 
 // forwardReq represents the JSON request payload for starting packet forwarding

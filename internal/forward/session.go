@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"anthonyuk.dev/erspan-hub/internal"
+
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 )
@@ -17,6 +18,9 @@ func NewForwardSessionBase(fsm *ForwardSessionManager, key StreamKey, streamID s
 		StreamInfoID: streamID,
 		Type:         handlerType,
 		Channel:      ch,
+		Stats: &ForwardSessionStats{
+			StartTime: time.Now().UnixNano(),
+		},
 	}
 	if filter != "" {
 		bpfFilter, err := pcap.NewBPF(layers.LinkTypeEthernet, 65535, filter)

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live ERSPAN Stream Dashboard</title>
+    <script>
+        // --- Configuration ---
+        const SSE_URL = '../streams/sse';
+    </script>
+    <!-- Load Tailwind CSS from CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for dark mode aesthetic */
+        body { font-family: 'Inter', sans-serif; }
+        
+        .data-cell {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(45, 55, 72, 0.5); /* dark gray border */
+        }
+        .header-cell {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #A0AEC0; /* Light text for header */
+            background-color: #2D3748; /* Dark background for header */
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .detail-row {
+            padding: 0;
+            background-color: #1a202c; /* Slightly darker background for details */
+            display: none; /* Initially hidden */
+        }
+        /* Mobile specific hidden header for better UX */
+        @media (max-width: 640px) {
+            .sm-hidden { display: none !important; }
+            .sm-visible { display: block !important; }
+            .data-cell { padding: 0.75rem 0.5rem; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-extrabold mb-2 text-white">ERSPAN streams</h1>
+        <p class="text-gray-400 mb-6">Total Streams: <span id="stream-count" class="font-bold text-yellow-400">0</span></p>
+
+        <!-- Loading and Error Messages -->
+        <div id="status-message" class="p-4 rounded-lg bg-blue-700/30 text-blue-300 transition-all duration-300 mb-4 hidden" role="alert">
+            Connecting to stream...
+        </div>
+
+        <!-- Main Table Container -->
+        <div class="bg-gray-800 rounded-xl shadow-2xl overflow-x-auto">
+            <table id="stream-table" class="min-w-full divide-y divide-gray-700">
+                <thead class="sticky top-0">
+                    <tr>
+                        <th class="header-cell w-20">Source IP / ERSPAN ID</th>
+                        <th class="header-cell w-24 sm-hidden">Source IP</th>
+                        <th class="header-cell w-20">Packets</th>
+                        <th class="header-cell w-20 sm-hidden">Bytes</th>
+                        <th class="header-cell w-32">Last Seen</th>
+                        <th class="header-cell w-24 text-center">Sessions</th>
+                    </tr>
+                </thead>
+                <tbody id="stream-data-body" class="divide-y divide-gray-700">
+                    <!-- Data will be injected here -->
+                    <tr>
+                        <td colspan="6" class="data-cell text-center text-gray-500 py-10">Waiting for SSE data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        // Set to store the IDs of streams that currently have their detail rows open.
+        const expandedStreams = new Set(); 
+
+        // DOM Elements
+        const tableBody = document.getElementById('stream-data-body');
+        const statusMessage = document.getElementById('status-message');
+        const streamCount = document.getElementById('stream-count');
+
+        // --- Utility Functions ---
+
+        /** Toggles the visibility of the detail row beneath the main row, and manages state. */
+        window.toggleDetails = function(streamId) {
+            const detailRow = document.getElementById(`detail-row-${streamId}`);
+            const button = document.getElementById(`session-button-${streamId}`);
+            
+            if (detailRow.style.display === 'table-row') {
+                detailRow.style.display = 'none';
+                expandedStreams.delete(streamId); // Remove from set
+            } else {
+                detailRow.style.display = 'table-row';
+                expandedStreams.add(streamId); // Add to set
+            }
+        }
+        
+        // Helper to sanitize stream ID for safe use as a DOM element ID
+        function sanitizeStreamId(id) {
+            return id.replace(/[./:]/g, '-');
+        }
+
+        /** Formats a timestamp string into a localized, human-readable format. */
+        function formatTimestamp(ts) {
+            try {
+                const date = new Date(ts);
+                return date.toLocaleString();
+            } catch {
+                return ts || 'N/A';
+            }
+        }
+
+        /** Formats bytes into human-readable K/M/G/T units. */
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        /** Formats a large number with commas. */
+        function formatNumber(num) {
+            return new Intl.NumberFormat().format(num);
+        }
+
+        /** Renders the session detail content for the expandable row. */
+        function renderSessionDetails(sessions) {
+            if (sessions.length === 0) return '';
+
+            let html = '<div class="p-4 space-y-3">';
+            
+            sessions.forEach((session, index) => {
+                const info = session.info || {};
+                const stats = session.stats || {};
+
+                info_html = `
+                    <ul class="mt-2 text-gray-300 space-y-0.5 text-xs">
+                        ${Object.entries(info).map(([key, value]) => `
+                            <li><span class="font-medium text-gray-500 w-24 inline-block">${key}:</span> ${value}</li>
+                        `).join('')}
+                    </ul>
+                `;
+                html += `
+                    <div class="border border-gray-700 p-3 rounded-lg bg-gray-700/50">
+                        <p class="font-semibold text-sm text-indigo-400">Session ${index + 1}: ${session.type}</p>
+                        <ul class="mt-2 text-gray-300 space-y-0.5 text-xs">
+                            <li><span class="font-medium text-gray-500 w-24 inline-block">ID:</span> ${session.stream_info_id}</li>
+                            <li><span class="font-medium text-gray-500 w-24 inline-block">Filter:</span> 
+                                <span class="bg-gray-900 text-yellow-300 px-1 rounded text-xs">${session.filter || 'None'}</span>
+                            </li>
+                            <li><span class="font-medium text-gray-500 w-24 inline-block">Peer:</span> ${info.peer_addr || 'N/A'}</li>
+                        </ul>
+                        <div class="mt-3 p-2 bg-gray-900 rounded-md">
+                            <p class="font-medium text-xs text-green-400">Statistics</p>
+                            <ul class="text-xs text-gray-400">
+                                <li>Total Pkts Sent: ${formatNumber(stats.total_packets || 0)}</li>
+                                <li>Filtered Pkts: ${formatNumber(stats.filtered_packets || 0)}</li>
+                            </ul>
+                        </div>
+                        <ul class="mt-2 text-gray-300 space-y-0.5 text-xs">
+                            ${info_html}
+                        </ul>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        // --- Render Functions ---
+
+        /** Renders the fetched data into the HTML table after sorting. */
+        function renderTable(data) {
+            // 1. Client-Side Sorting: Sort by Stream ID (string comparison)
+            data.sort((a, b) => a.id.localeCompare(b.id));
+
+            tableBody.innerHTML = ''; // Clear existing rows
+            streamCount.textContent = formatNumber(data.length);
+            
+            if (data.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="data-cell text-center text-gray-500 py-10">No active streams found.</td></tr>`;
+                return;
+            }
+
+            data.forEach(item => {
+                const stream = item.stream_info;
+                const sessions = stream.forward_sessions || [];
+                const sessionsCount = sessions.length;
+                const streamId = sanitizeStreamId(item.id); 
+                const isExpanded = expandedStreams.has(streamId); // Check state
+
+                // --- 2. Main Row ---
+                const mainRow = document.createElement('tr');
+                mainRow.className = 'hover:bg-gray-700 transition-colors duration-100 cursor-pointer';
+                mainRow.onclick = sessionsCount > 0 ? () => toggleDetails(streamId) : null;
+
+
+                mainRow.innerHTML = `
+                    <td class="data-cell text-sm font-medium text-indigo-400 break-all">${item.id}</td>
+                    <td class="data-cell text-xs sm-hidden">${stream.src_ip}</td>
+                    <td class="data-cell font-mono text-sm">${formatNumber(stream.packets || 0)}</td>
+                    <td class="data-cell text-xs sm-hidden">${formatBytes(stream.bytes || 0)}</td>
+                    <td class="data-cell text-xs">${formatTimestamp(stream.last_seen)}</td>
+                    <td class="data-cell text-center">
+                        ${sessionsCount > 0 ? `
+                            <button id="session-button-${streamId}" onclick="event.stopPropagation(); toggleDetails('${streamId}')" 
+                                class="px-3 py-1 text-xs font-semibold rounded-full 
+                                bg-green-600 hover:bg-green-700 text-white flex items-center justify-center mx-auto 
+                                transition-transform duration-200 ease-in-out ${isExpanded ? '' : ''}">
+                                ${sessionsCount} <span class="ml-1 text-base transform transition-transform duration-200">›</span>
+                            </button>
+                        ` : `
+                            <span class="px-3 py-1 text-xs font-semibold rounded-full bg-gray-600 text-gray-300">0</span>
+                        `}
+                    </td>
+                `;
+                tableBody.appendChild(mainRow);
+                
+                // --- 3. Detail Row (for Forward Sessions) ---
+                if (sessionsCount > 0) {
+                    const detailRow = document.createElement('tr');
+                    detailRow.id = `detail-row-${streamId}`;
+                    detailRow.className = 'detail-row';
+                    
+                    // Restore state
+                    if (isExpanded) {
+                        detailRow.style.display = 'table-row';
+                    }
+
+                    detailRow.innerHTML = `
+                        <td colspan="6" class="p-0 border-b-2 border-indigo-500">
+                            ${renderSessionDetails(sessions)}
+                        </td>
+                    `;
+                    tableBody.appendChild(detailRow);
+                }
+            });
+        }
+
+
+        // --- SSE Logic ---
+        function startSSEConnection() {
+            statusMessage.textContent = 'Connecting to stream...';
+            statusMessage.classList.remove('hidden', 'bg-red-700/30', 'text-red-300');
+            statusMessage.classList.add('bg-blue-700/30', 'text-blue-300');
+
+            const source = new EventSource(SSE_URL);
+
+            source.onopen = function() {
+                console.log("SSE Connection established.");
+                statusMessage.classList.add('hidden');
+            };
+
+            source.onmessage = function(event) {
+                try {
+                    // Ignore SSE comments used for keep-alive
+                    if (event.data.trim() === '') return;
+                    
+                    const data = JSON.parse(event.data);
+                    renderTable(data);
+                } catch (e) {
+                    console.error("Error parsing SSE data:", e);
+                    statusMessage.textContent = 'Received invalid data from server.';
+                    statusMessage.classList.remove('hidden', 'bg-blue-700/30', 'text-blue-300');
+                    statusMessage.classList.add('bg-red-700/30', 'text-red-300');
+                }
+            };
+
+            source.onerror = function(error) {
+                console.error("SSE Error:", error);
+                source.close(); // Stop trying to reconnect immediately
+                statusMessage.textContent = 'Connection lost. Reconnecting in 3s...';
+                statusMessage.classList.remove('hidden', 'bg-blue-700/30', 'text-blue-300');
+                statusMessage.classList.add('bg-red-700/30', 'text-red-300');
+
+                // Reconnect logic
+                setTimeout(startSSEConnection, 3000);
+            };
+        }
+
+        // Initialize SSE connection
+        startSSEConnection();
+    </script>
+
+</body>
+</html>

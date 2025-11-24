@@ -24,10 +24,11 @@ const (
 // The client sends this message to start the packet stream
 type ForwardRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SrcIp         string                 `protobuf:"bytes,1,opt,name=src_ip,json=srcIp,proto3" json:"src_ip,omitempty"`                        // Source IP address
-	ErspanId      uint32                 `protobuf:"varint,2,opt,name=erspan_id,json=erspanId,proto3" json:"erspan_id,omitempty"`              // ERSPAN ID
-	StreamInfoId  string                 `protobuf:"bytes,3,opt,name=stream_info_id,json=streamInfoId,proto3" json:"stream_info_id,omitempty"` // Stream information ID
-	Filter        string                 `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`                                   // Filter for the stream
+	SrcIp         string                 `protobuf:"bytes,1,opt,name=src_ip,json=srcIp,proto3" json:"src_ip,omitempty"`                                                                                           // Source IP address
+	ErspanId      uint32                 `protobuf:"varint,2,opt,name=erspan_id,json=erspanId,proto3" json:"erspan_id,omitempty"`                                                                                 // ERSPAN ID
+	StreamInfoId  string                 `protobuf:"bytes,3,opt,name=stream_info_id,json=streamInfoId,proto3" json:"stream_info_id,omitempty"`                                                                    // Stream information ID
+	Filter        string                 `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`                                                                                                      // Filter for the stream
+	ClientInfo    map[string]string      `protobuf:"bytes,15,rep,name=client_info,json=clientInfo,proto3" json:"client_info,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // Arbitrary key/value pairs with info about the client, e.g. OS, version, user, etc.
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -90,29 +91,37 @@ func (x *ForwardRequest) GetFilter() string {
 	return ""
 }
 
+func (x *ForwardRequest) GetClientInfo() map[string]string {
+	if x != nil {
+		return x.ClientInfo
+	}
+	return nil
+}
+
 // The server streams back multiple messages of this type.
-type Packet struct {
+type PacketBlock struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Timestamp     int64                  `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"` // Packet timestamp (Unix time in nanoseconds), or <0 for shutdown signal
-	RawData       []byte                 `protobuf:"bytes,2,opt,name=raw_data,json=rawData,proto3" json:"raw_data,omitempty"`
+	Timestamp     int64                  `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`                        // Message timestamp (Unix time in nanoseconds), or <0 for shutdown signal
+	PacketCount   uint32                 `protobuf:"varint,2,opt,name=packet_count,json=packetCount,proto3" json:"packet_count,omitempty"` // Number of packets in this block
+	RawData       []byte                 `protobuf:"bytes,3,opt,name=raw_data,json=rawData,proto3" json:"raw_data,omitempty"`              // may contain multiple packets in pcap/pcapng format
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Packet) Reset() {
-	*x = Packet{}
+func (x *PacketBlock) Reset() {
+	*x = PacketBlock{}
 	mi := &file_pcap_v1_pcap_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Packet) String() string {
+func (x *PacketBlock) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Packet) ProtoMessage() {}
+func (*PacketBlock) ProtoMessage() {}
 
-func (x *Packet) ProtoReflect() protoreflect.Message {
+func (x *PacketBlock) ProtoReflect() protoreflect.Message {
 	mi := &file_pcap_v1_pcap_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -124,19 +133,26 @@ func (x *Packet) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Packet.ProtoReflect.Descriptor instead.
-func (*Packet) Descriptor() ([]byte, []int) {
+// Deprecated: Use PacketBlock.ProtoReflect.Descriptor instead.
+func (*PacketBlock) Descriptor() ([]byte, []int) {
 	return file_pcap_v1_pcap_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *Packet) GetTimestamp() int64 {
+func (x *PacketBlock) GetTimestamp() int64 {
 	if x != nil {
 		return x.Timestamp
 	}
 	return 0
 }
 
-func (x *Packet) GetRawData() []byte {
+func (x *PacketBlock) GetPacketCount() uint32 {
+	if x != nil {
+		return x.PacketCount
+	}
+	return 0
+}
+
+func (x *PacketBlock) GetRawData() []byte {
 	if x != nil {
 		return x.RawData
 	}
@@ -319,15 +335,21 @@ var File_pcap_v1_pcap_proto protoreflect.FileDescriptor
 
 const file_pcap_v1_pcap_proto_rawDesc = "" +
 	"\n" +
-	"\x12pcap/v1/pcap.proto\x12\x12erspan_hub.pcap.v1\"\x82\x01\n" +
+	"\x12pcap/v1/pcap.proto\x12\x12erspan_hub.pcap.v1\"\x9c\x02\n" +
 	"\x0eForwardRequest\x12\x15\n" +
 	"\x06src_ip\x18\x01 \x01(\tR\x05srcIp\x12\x1b\n" +
 	"\terspan_id\x18\x02 \x01(\rR\berspanId\x12$\n" +
 	"\x0estream_info_id\x18\x03 \x01(\tR\fstreamInfoId\x12\x16\n" +
-	"\x06filter\x18\x04 \x01(\tR\x06filter\"A\n" +
-	"\x06Packet\x12\x1c\n" +
-	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12\x19\n" +
-	"\braw_data\x18\x02 \x01(\fR\arawData\"R\n" +
+	"\x06filter\x18\x04 \x01(\tR\x06filter\x12S\n" +
+	"\vclient_info\x18\x0f \x03(\v22.erspan_hub.pcap.v1.ForwardRequest.ClientInfoEntryR\n" +
+	"clientInfo\x1a=\n" +
+	"\x0fClientInfoEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x05\x10\x0f\"i\n" +
+	"\vPacketBlock\x12\x1c\n" +
+	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12!\n" +
+	"\fpacket_count\x18\x02 \x01(\rR\vpacketCount\x12\x19\n" +
+	"\braw_data\x18\x03 \x01(\fR\arawData\"R\n" +
 	"\x0eBPFInstruction\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\rR\x04code\x12\x0e\n" +
 	"\x02jt\x18\x02 \x01(\rR\x02jt\x12\x0e\n" +
@@ -338,9 +360,9 @@ const file_pcap_v1_pcap_proto_rawDesc = "" +
 	"\x16ValidateFilterResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12#\n" +
 	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\x124\n" +
-	"\x03bpf\x18\x03 \x03(\v2\".erspan_hub.pcap.v1.BPFInstructionR\x03bpf2b\n" +
-	"\rPcapForwarder\x12Q\n" +
-	"\rForwardStream\x12\".erspan_hub.pcap.v1.ForwardRequest\x1a\x1a.erspan_hub.pcap.v1.Packet0\x012\x80\x01\n" +
+	"\x03bpf\x18\x03 \x03(\v2\".erspan_hub.pcap.v1.BPFInstructionR\x03bpf2g\n" +
+	"\rPcapForwarder\x12V\n" +
+	"\rForwardStream\x12\".erspan_hub.pcap.v1.ForwardRequest\x1a\x1f.erspan_hub.pcap.v1.PacketBlock0\x012\x80\x01\n" +
 	"\x15ValidateFilterService\x12g\n" +
 	"\x0eValidateFilter\x12).erspan_hub.pcap.v1.ValidateFilterRequest\x1a*.erspan_hub.pcap.v1.ValidateFilterResponseB4Z2anthonyuk.dev/erspan-hub/generated/pcap/v1;pcap_v1b\x06proto3"
 
@@ -356,25 +378,27 @@ func file_pcap_v1_pcap_proto_rawDescGZIP() []byte {
 	return file_pcap_v1_pcap_proto_rawDescData
 }
 
-var file_pcap_v1_pcap_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_pcap_v1_pcap_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_pcap_v1_pcap_proto_goTypes = []any{
 	(*ForwardRequest)(nil),         // 0: erspan_hub.pcap.v1.ForwardRequest
-	(*Packet)(nil),                 // 1: erspan_hub.pcap.v1.Packet
+	(*PacketBlock)(nil),            // 1: erspan_hub.pcap.v1.PacketBlock
 	(*BPFInstruction)(nil),         // 2: erspan_hub.pcap.v1.BPFInstruction
 	(*ValidateFilterRequest)(nil),  // 3: erspan_hub.pcap.v1.ValidateFilterRequest
 	(*ValidateFilterResponse)(nil), // 4: erspan_hub.pcap.v1.ValidateFilterResponse
+	nil,                            // 5: erspan_hub.pcap.v1.ForwardRequest.ClientInfoEntry
 }
 var file_pcap_v1_pcap_proto_depIdxs = []int32{
-	2, // 0: erspan_hub.pcap.v1.ValidateFilterResponse.bpf:type_name -> erspan_hub.pcap.v1.BPFInstruction
-	0, // 1: erspan_hub.pcap.v1.PcapForwarder.ForwardStream:input_type -> erspan_hub.pcap.v1.ForwardRequest
-	3, // 2: erspan_hub.pcap.v1.ValidateFilterService.ValidateFilter:input_type -> erspan_hub.pcap.v1.ValidateFilterRequest
-	1, // 3: erspan_hub.pcap.v1.PcapForwarder.ForwardStream:output_type -> erspan_hub.pcap.v1.Packet
-	4, // 4: erspan_hub.pcap.v1.ValidateFilterService.ValidateFilter:output_type -> erspan_hub.pcap.v1.ValidateFilterResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	5, // 0: erspan_hub.pcap.v1.ForwardRequest.client_info:type_name -> erspan_hub.pcap.v1.ForwardRequest.ClientInfoEntry
+	2, // 1: erspan_hub.pcap.v1.ValidateFilterResponse.bpf:type_name -> erspan_hub.pcap.v1.BPFInstruction
+	0, // 2: erspan_hub.pcap.v1.PcapForwarder.ForwardStream:input_type -> erspan_hub.pcap.v1.ForwardRequest
+	3, // 3: erspan_hub.pcap.v1.ValidateFilterService.ValidateFilter:input_type -> erspan_hub.pcap.v1.ValidateFilterRequest
+	1, // 4: erspan_hub.pcap.v1.PcapForwarder.ForwardStream:output_type -> erspan_hub.pcap.v1.PacketBlock
+	4, // 5: erspan_hub.pcap.v1.ValidateFilterService.ValidateFilter:output_type -> erspan_hub.pcap.v1.ValidateFilterResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_pcap_v1_pcap_proto_init() }
@@ -388,7 +412,7 @@ func file_pcap_v1_pcap_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pcap_v1_pcap_proto_rawDesc), len(file_pcap_v1_pcap_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

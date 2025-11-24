@@ -10,18 +10,21 @@ message ForwardRequest {
     uint32 erspan_id = 2; // ERSPAN ID
     string stream_info_id = 3; // Stream information ID
     string filter = 4; // Filter for the stream
+    reserved 5 to 14; // Reserved for future use
+    map<string, string> client_info = 15; // Arbitrary key/value pairs with info about the client, e.g. OS, version, user, etc.
 }
 
 
 // The server streams back multiple messages of this type.
-message Packet {
-    int64 timestamp = 1; // Packet timestamp (Unix time in nanoseconds), or <0 for shutdown signal
-    bytes raw_data = 2;
+message PacketBlock {
+    int64 timestamp = 1; // Message timestamp (Unix time in nanoseconds), or <0 for shutdown signal
+    uint32 packet_count = 2; // Number of packets in this block
+    bytes raw_data = 3; // may contain multiple packets in pcap/pcapng format
 }
 
 // The service definition for the streaming API.
 service PcapForwarder {
-    rpc ForwardStream (ForwardRequest) returns (stream Packet);
+    rpc ForwardStream (ForwardRequest) returns (stream PacketBlock);
 }
 
 

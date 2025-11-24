@@ -4,6 +4,7 @@ go 1.24.6
 
 require (
 	github.com/go-chi/chi/v5 v5.2.3
+	github.com/go-chi/httplog/v3 v3.3.0
 	github.com/google/gopacket v1.1.19
 	github.com/knadh/koanf v1.5.0
 	github.com/prometheus/client_golang v1.23.2

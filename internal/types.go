@@ -77,6 +77,7 @@ type ForwardSession interface {
 	GetType() string
 	GetFilterString() string
 	GetInfo() map[string]string
+	GetStatsMap() *map[string]any
 	MarshalJSON() ([]byte, error)
 }
 

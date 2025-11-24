@@ -28,7 +28,7 @@ const (
 //
 // The service definition for the streaming API.
 type PcapForwarderClient interface {
-	ForwardStream(ctx context.Context, in *ForwardRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Packet], error)
+	ForwardStream(ctx context.Context, in *ForwardRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[PacketBlock], error)
 }
 
 type pcapForwarderClient struct {
@@ -39,13 +39,13 @@ func NewPcapForwarderClient(cc grpc.ClientConnInterface) PcapForwarderClient {
 	return &pcapForwarderClient{cc}
 }
 
-func (c *pcapForwarderClient) ForwardStream(ctx context.Context, in *ForwardRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Packet], error) {
+func (c *pcapForwarderClient) ForwardStream(ctx context.Context, in *ForwardRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[PacketBlock], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &PcapForwarder_ServiceDesc.Streams[0], PcapForwarder_ForwardStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[ForwardRequest, Packet]{ClientStream: stream}
+	x := &grpc.GenericClientStream[ForwardRequest, PacketBlock]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (c *pcapForwarderClient) ForwardStream(ctx context.Context, in *ForwardRequ
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type PcapForwarder_ForwardStreamClient = grpc.ServerStreamingClient[Packet]
+type PcapForwarder_ForwardStreamClient = grpc.ServerStreamingClient[PacketBlock]
 
 // PcapForwarderServer is the server API for PcapForwarder service.
 // All implementations must embed UnimplementedPcapForwarderServer
@@ -64,7 +64,7 @@ type PcapForwarder_ForwardStreamClient = grpc.ServerStreamingClient[Packet]
 //
 // The service definition for the streaming API.
 type PcapForwarderServer interface {
-	ForwardStream(*ForwardRequest, grpc.ServerStreamingServer[Packet]) error
+	ForwardStream(*ForwardRequest, grpc.ServerStreamingServer[PacketBlock]) error
 	mustEmbedUnimplementedPcapForwarderServer()
 }
 
@@ -75,7 +75,7 @@ type PcapForwarderServer interface {
 // pointer dereference when methods are called.
 type UnimplementedPcapForwarderServer struct{}
 
-func (UnimplementedPcapForwarderServer) ForwardStream(*ForwardRequest, grpc.ServerStreamingServer[Packet]) error {
+func (UnimplementedPcapForwarderServer) ForwardStream(*ForwardRequest, grpc.ServerStreamingServer[PacketBlock]) error {
 	return status.Errorf(codes.Unimplemented, "method ForwardStream not implemented")
 }
 func (UnimplementedPcapForwarderServer) mustEmbedUnimplementedPcapForwarderServer() {}
@@ -104,11 +104,11 @@ func _PcapForwarder_ForwardStream_Handler(srv interface{}, stream grpc.ServerStr
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(PcapForwarderServer).ForwardStream(m, &grpc.GenericServerStream[ForwardRequest, Packet]{ServerStream: stream})
+	return srv.(PcapForwarderServer).ForwardStream(m, &grpc.GenericServerStream[ForwardRequest, PacketBlock]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type PcapForwarder_ForwardStreamServer = grpc.ServerStreamingServer[Packet]
+type PcapForwarder_ForwardStreamServer = grpc.ServerStreamingServer[PacketBlock]
 
 // PcapForwarder_ServiceDesc is the grpc.ServiceDesc for PcapForwarder service.
 // It's only intended for direct use with grpc.RegisterService,

@@ -3,6 +3,7 @@ package forward
 // Convert raw Ethernet frames into pcap or pcapng streams
 
 import (
+	"fmt"
 	"io"
 	"runtime"
 	"time"
@@ -42,6 +43,8 @@ type PcapNgWriter struct {
 func NewPcapNgWriter(w io.Writer, fs ForwardSessionChannel) (*PcapNgWriter, error) {
 	intf := MyNgInterface
 	intf.Name = "erspan-1"
+	intf.Description = fmt.Sprintf("ERSPAN-Hub Stream: %s", fs.GetStreamKey().String())
+	intf.Filter = fs.GetFilterString()
 	ngw, err := pcapgo.NewNgWriterInterface(w, intf, MyNgWriterOptions)
 	if err != nil {
 		return nil, err

@@ -6,15 +6,16 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
-
-	"github.com/spf13/pflag"
 
 	"anthonyuk.dev/erspan-hub/internal/capture"
 	"anthonyuk.dev/erspan-hub/internal/config"
 	"anthonyuk.dev/erspan-hub/internal/grpc"
 	"anthonyuk.dev/erspan-hub/internal/rest"
+
+	"github.com/spf13/pflag"
 )
 
 // Override these variables at build time using -ldflags
@@ -33,6 +34,19 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Configuration error: %v\n", err)
 		os.Exit(1)
 	}
+
+	if cfg.ShowVersion {
+		fmt.Printf("erspan-hub - ERSPAN packet capture hub\n")
+		fmt.Printf("Version=%s\n", Version)
+		fmt.Printf("Commit=%s\n", Commit)
+		fmt.Printf("Date=%s\n", Date)
+		buildInfo, ok := debug.ReadBuildInfo()
+		if ok {
+			fmt.Printf("buildinf: %+v\n", buildInfo)
+		}
+		os.Exit(0)
+	}
+
 	logHandlerOptions := slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}
@@ -60,10 +74,10 @@ func main() {
 func server(cfg *config.Config, logger *slog.Logger) {
 	ci := capture.NewCaptureInstance(logger)
 	go func() {
-		rest.RunServer(&rest.Config{Port: cfg.RestPort}, ci.ForwardSessionManager())
+		rest.RunServer(&rest.Config{BindIP: cfg.RestIP, Port: cfg.RestPort}, ci.ForwardSessionManager())
 	}()
 	go func() {
-		grpc.RunServer(&grpc.Config{Port: cfg.GrpcPort}, ci.ForwardSessionManager())
+		grpc.RunServer(&grpc.Config{BindIP: cfg.GrpcIP, Port: cfg.GrpcPort}, ci.ForwardSessionManager())
 	}()
 
 	quit := make(chan os.Signal, 1)

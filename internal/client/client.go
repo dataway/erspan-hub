@@ -100,7 +100,6 @@ func (c *Client) ValidateFilter(ctx context.Context, filter string) (valid bool,
 		Filter: filter,
 	})
 	if err != nil {
-		c.Logger.Error("could not validate filter", "error", err)
 		return false, "", nil, err
 	}
 	return resp.Valid, resp.ErrorMessage, resp.Bpf, nil
