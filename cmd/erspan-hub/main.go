@@ -74,10 +74,14 @@ func main() {
 func server(cfg *config.Config, logger *slog.Logger) {
 	ci := capture.NewCaptureInstance(logger)
 	go func() {
-		rest.RunServer(&rest.Config{BindIP: cfg.RestIP, Port: cfg.RestPort}, ci.ForwardSessionManager())
+		rest.RunServer(&rest.Config{BindIP: cfg.RestIP, Port: cfg.RestPort, RestPrefix: cfg.RestPrefix}, ci.ForwardSessionManager())
 	}()
 	go func() {
-		grpc.RunServer(&grpc.Config{BindIP: cfg.GrpcIP, Port: cfg.GrpcPort}, ci.ForwardSessionManager())
+		err := grpc.RunServer(&grpc.Config{BindIP: cfg.GrpcIP, Port: cfg.GrpcPort, TLSCertFile: cfg.GrpcTLSCertFile, TLSKeyFile: cfg.GrpcTLSKeyFile}, ci.ForwardSessionManager())
+		if err != nil {
+			logger.Error("failed to start gRPC server", "error", err)
+			panic(err)
+		}
 	}()
 
 	quit := make(chan os.Signal, 1)

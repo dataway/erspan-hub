@@ -12,13 +12,16 @@ import (
 )
 
 type Config struct {
-	RestIP      string `koanf:"rest-ip"`
-	RestPort    uint16 `koanf:"rest-port"`
-	GrpcIP      string `koanf:"grpc-ip"`
-	GrpcPort    uint16 `koanf:"grpc-port"`
-	LogLevel    int    `koanf:"verbose"`
-	LogJson     bool   `koanf:"log-json"`
-	ShowVersion bool   `koanf:"version"`
+	RestIP          string `koanf:"rest-ip"`
+	RestPort        uint16 `koanf:"rest-port"`
+	RestPrefix      string `koanf:"rest-prefix"`
+	GrpcIP          string `koanf:"grpc-ip"`
+	GrpcPort        uint16 `koanf:"grpc-port"`
+	GrpcTLSCertFile string `koanf:"grpc-tls-cert-file"`
+	GrpcTLSKeyFile  string `koanf:"grpc-tls-key-file"`
+	LogLevel        int    `koanf:"verbose"`
+	LogJson         bool   `koanf:"log-json"`
+	ShowVersion     bool   `koanf:"version"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -30,8 +33,11 @@ func LoadConfig() (*Config, error) {
 	}
 	fs.String("rest-ip", "", "Bind REST API server to IP")
 	fs.Uint16("rest-port", 8090, "Port for REST API server")
+	fs.String("rest-prefix", "", "REST API URL prefix if behind a reverse proxy")
 	fs.String("grpc-ip", "", "Bind gRPC server to IP")
 	fs.Uint16("grpc-port", 9090, "Port for gRPC server")
+	fs.String("grpc-tls-cert-file", "", "Path to gRPC TLS certificate file")
+	fs.String("grpc-tls-key-file", "", "Path to gRPC TLS key file")
 	fs.BoolP("log-json", "j", false, "Enable JSON formatted logs")
 	fs.CountP("verbose", "v", "Verbose logging (-v, -vv, -vvv)")
 	fs.BoolP("version", "V", false, "Show version information")

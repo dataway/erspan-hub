@@ -1,7 +1,6 @@
 package hubcap
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -9,7 +8,6 @@ import (
 
 	pcap_v1 "anthonyuk.dev/erspan-hub/generated/pcap/v1"
 	streams_v1 "anthonyuk.dev/erspan-hub/generated/streams/v1"
-	"anthonyuk.dev/erspan-hub/internal/client"
 )
 
 func RunCapture(cfg *Config, logger *slog.Logger, clientInfo map[string]string) (err error) {
@@ -20,11 +18,8 @@ func RunCapture(cfg *Config, logger *slog.Logger, clientInfo map[string]string) 
 	}
 	defer fifo.Close()
 
-	cl := client.NewClientOrExit(&client.Config{GrpcUrl: cfg.GrpcUrl}, logger)
+	cl, ctx := NewClientOrExit(cfg, logger)
 	defer cl.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	var ctrlOut *os.File = nil
 	var ctrlCh chan ExtcapControlPkt

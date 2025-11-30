@@ -86,8 +86,14 @@ buildclient: tidy proto
 buildwinclient: tidy proto
 	@echo "→ go build windows client → $(BIN_DIR)/$(CLIENT_BIN).exe"
 	@mkdir -p $(BIN_DIR)
+	go-winres make \
+		--in $(CLIENT_DIR)/winres.json \
+		--product-version "$(VERSION)" \
+		--file-version "$(VERSION)" \
+		--out $(CLIENT_DIR)/winres
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
 	go build $(LDFLAGS) -o $(BIN_DIR)/$(CLIENT_BIN).exe ./$(CLIENT_DIR)
+	rm $(CLIENT_DIR)/winres_windows_*.syso
 
 rpm: build
 	@echo "→ create RPM package"

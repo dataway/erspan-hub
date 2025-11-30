@@ -2,6 +2,9 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"log/slog"
 	"os"
 	"time"
@@ -10,11 +13,15 @@ import (
 	streams_v1 "anthonyuk.dev/erspan-hub/generated/streams/v1"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Config struct {
-	GrpcUrl string
+	GrpcUrl         string
+	GrpcTLS         bool
+	GrpcTLSInsecure bool
+	GrpcTLSCAFile   string
 }
 
 type Client struct {
@@ -27,7 +34,36 @@ type Client struct {
 }
 
 func NewClient(cfg *Config, logger *slog.Logger) (*Client, error) {
-	conn, err := grpc.NewClient(cfg.GrpcUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	var opts []grpc.DialOption
+	if cfg.GrpcTLS {
+		// Set up options for TLS connection
+		tlsConfig := &tls.Config{
+			ServerName: cfg.GrpcUrl,
+		}
+		if cfg.GrpcTLSInsecure {
+			tlsConfig.InsecureSkipVerify = true
+		} else if cfg.GrpcTLSCAFile != "" {
+			caCert, err := os.ReadFile(cfg.GrpcTLSCAFile)
+			if err != nil {
+				logger.Error("failed to read CA file", "path", cfg.GrpcTLSCAFile, "error", err)
+				return nil, err
+			}
+			certPool := x509.NewCertPool()
+			if !certPool.AppendCertsFromPEM(caCert) {
+				logger.Error("CA file did not contain a valid PEM certificate", "path", cfg.GrpcTLSCAFile)
+				return nil, errors.New("invalid CA certificate file")
+			}
+			tlsConfig.RootCAs = certPool
+			logger.Info("Using custom CA file for server certificate verification.", "path", cfg.GrpcTLSCAFile)
+		}
+		creds := credentials.NewTLS(tlsConfig)
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+	} else {
+		// Non-TLS connection
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+	logger.Info("Connecting to gRPC server", "url", cfg.GrpcUrl, "opts", opts)
+	conn, err := grpc.NewClient(cfg.GrpcUrl, opts...)
 	if err != nil {
 		logger.Error("did not connect", "error", err)
 		return nil, err
@@ -41,15 +77,6 @@ func NewClient(cfg *Config, logger *slog.Logger) (*Client, error) {
 		ValidateFilterClient: pcap_v1.NewValidateFilterServiceClient(conn),
 	}
 	return client, nil
-}
-
-func NewClientOrExit(cfg *Config, logger *slog.Logger) *Client {
-	client, err := NewClient(cfg, logger)
-	if err != nil {
-		logger.Error("failed to create client", "error", err)
-		os.Exit(1)
-	}
-	return client
 }
 
 func (c *Client) Close() {

@@ -11,10 +11,10 @@ import (
 var content embed.FS
 
 // Setup static file server and routes
-func setupStatic(r *chi.Mux) {
+func setupStatic(r *chi.Mux, prefix string) {
 	fs := http.FileServer(http.FS(content))
-	r.Handle("/static/*", fs)
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "static/stream_dashboard.html", http.StatusSeeOther)
+	r.Handle(prefix+"/static/*", http.StripPrefix(prefix, fs))
+	r.Get(prefix, func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, prefix+"/static/stream_dashboard.html", http.StatusSeeOther)
 	})
 }

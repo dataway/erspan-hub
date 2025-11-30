@@ -16,6 +16,7 @@ import (
 	"anthonyuk.dev/erspan-hub/internal/forward"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 type GrpcServer struct {
@@ -37,7 +38,23 @@ func RunServer(cfg *Config, fsm *forward.ForwardSessionManager) error {
 		return fmt.Errorf("failed to listen for gRPC: %v", err)
 	}
 
-	s := grpc.NewServer()
+	var opts []grpc.ServerOption
+	if cfg.TLSCertFile != "" {
+		var creds credentials.TransportCredentials
+		if cfg.TLSKeyFile == "" {
+			creds, err = credentials.NewServerTLSFromFile(cfg.TLSCertFile, cfg.TLSCertFile)
+		} else {
+			creds, err = credentials.NewServerTLSFromFile(cfg.TLSCertFile, cfg.TLSKeyFile)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to load gRPC TLS credentials: %v", err)
+		}
+		opts = append(opts, grpc.Creds(creds))
+		gsvr.logger.Info("gRPC TLS enabled", "cert_file", cfg.TLSCertFile, "key_file", cfg.TLSKeyFile)
+	} else {
+		gsvr.logger.Info("gRPC TLS not enabled")
+	}
+	s := grpc.NewServer(opts...)
 
 	streams_v1.RegisterStreamsServiceServer(s, &StreamsServiceServer{gsvr: gsvr})
 	pcap_v1.RegisterPcapForwarderServer(s, &PcapForwarderServer{gsvr: gsvr})

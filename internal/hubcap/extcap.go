@@ -40,7 +40,10 @@ func HandleExtcapOptions(cfg *Config, logger *slog.Logger) (handled bool, err er
 	}
 	if cfg.ExtcapConfig && cfg.ExtcapReloadOption == "" {
 		fmt.Printf("arg {number=0}{call=--grpcurl}{type=string}{display=gRPC server URL}{tooltip=The URL of the erspan-hub gRPC server}\n")
-		fmt.Printf(`arg {number=2}{call=--log-level}{display=Set the log level}{type=selector}{tooltip=Set the log level}{required=false}{group=Debug}
+		fmt.Printf("arg {number=1}{call=--grpc-tls}{type=boolflag}{display=gRPC TLS}{tooltip=Enable TLS on gRPC connection}\n")
+		fmt.Printf("arg {number=2}{call=--grpc-tls-insecure}{type=boolflag}{display=Insecure gRPC TLS}{tooltip=Skip TLS certificate verification}\n")
+		fmt.Printf("arg {number=3}{call=--grpc-tls-ca-file}{type=fileselect}{display=gRPC TLS CA File}{tooltip=Path to the gRPC TLS CA file}\n")
+		fmt.Printf(`arg {number=9}{call=--log-level}{display=Set the log level}{type=selector}{tooltip=Set the log level}{required=false}{group=Debug}
 value {arg=2}{value=warn}{display=Warnings}{default=true}
 value {arg=2}{value=info}{display=Info}
 value {arg=2}{value=debug}{display=Debug}

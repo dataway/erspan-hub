@@ -27,6 +27,10 @@ type Config struct {
 	BpfDumpType           int    `koanf:"bpf-dump-type"` // 0=none, 2=C, 3=decimal
 	Fifo                  string `koanf:"fifo"`
 	GrpcUrl               string `koanf:"grpcurl"`
+	GrpcTLS               bool   `koanf:"grpc-tls"`
+	GrpcTLSInsecure       bool   `koanf:"grpc-tls-insecure"`
+	GrpcTLSCAFile         string `koanf:"grpc-tls-ca-file"`
+	GrpcTLSCA             string `koanf:"grpc-tls-ca"`
 	ListStreams           bool   `koanf:"list-streams"`
 	TestCapture           bool   `koanf:"test-capture"`
 	LogLevel              int    `koanf:"verbose"`
@@ -58,7 +62,10 @@ func LoadConfig() (*Config, error) {
 	fs.CountP("bpf-dump-type", "d", "Dump BPF instructions (-dd=C, -ddd=decimal)")
 	fs.String("fifo", "", "dump data to file or fifo")
 
-	fs.String("grpcurl", "localhost:9090", "URL for gRPC server")
+	fs.StringP("grpcurl", "g", "localhost:9090", "URL for gRPC server")
+	fs.BoolP("grpc-tls", "s", false, "Enable TLS for gRPC connection")
+	fs.BoolP("grpc-tls-insecure", "k", false, "Skip gRPC TLS certificate verification")
+	fs.String("grpc-tls-ca-file", "", "CA file for gRPC TLS connection (uses system CAs if empty)")
 	fs.BoolP("list-streams", "l", false, "List available streams")
 	fs.Bool("test-capture", false, "Test capture (subscribe to first stream and discard packets)")
 	fs.BoolP("log-json", "j", false, "Enable JSON formatted logs")

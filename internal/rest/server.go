@@ -32,7 +32,13 @@ func RunServer(cfg *Config, fsm *forward.ForwardSessionManager) error {
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
+	r.Use(middleware.StripSlashes)
 	r.Use(httplog.RequestLogger(fsm.Logger(), &httplog.Options{}))
+	api := r
+	if cfg.RestPrefix != "" {
+		api = chi.NewRouter()
+		r.Mount(cfg.RestPrefix, api)
+	}
 
 	rsvr := &RestServer{
 		logger: fsm.Logger(),
@@ -40,12 +46,12 @@ func RunServer(cfg *Config, fsm *forward.ForwardSessionManager) error {
 		fsm:    fsm,
 	}
 
-	setupStatic(r)
+	setupStatic(r, cfg.RestPrefix)
 
 	// API routes
-	r.Get("/streams", rsvr.listStreamsHandler)
-	r.Get("/streams/sse", rsvr.listStreamsSseHandler)
-	r.Post("/forward", rsvr.createForwardSessionHandler)
+	api.Get("/streams", rsvr.listStreamsHandler)
+	api.Get("/streams/sse", rsvr.listStreamsSseHandler)
+	api.Post("/forward", rsvr.createForwardSessionHandler)
 	r.Handle("/metrics", promhttp.Handler())
 	r.HandleFunc("/debug/pprof/", pprof.Index)
 	r.HandleFunc("/debug/pprof/allocs", pprof.Handler("allocs").ServeHTTP)

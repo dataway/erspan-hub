@@ -3,6 +3,7 @@ package hubcap
 import (
 	"context"
 	"log/slog"
+	"os"
 
 	pcap_v1 "anthonyuk.dev/erspan-hub/generated/pcap/v1"
 	"anthonyuk.dev/erspan-hub/internal/client"
@@ -10,7 +11,10 @@ import (
 
 func NewClient(cfg *Config, logger *slog.Logger) (*client.Client, context.Context, error) {
 	client_cfg := &client.Config{
-		GrpcUrl: cfg.GrpcUrl,
+		GrpcUrl:         cfg.GrpcUrl,
+		GrpcTLS:         cfg.GrpcTLS,
+		GrpcTLSInsecure: cfg.GrpcTLSInsecure,
+		GrpcTLSCAFile:   cfg.GrpcTLSCAFile,
 	}
 	cl, err := client.NewClient(client_cfg, logger)
 	if err != nil {
@@ -18,6 +22,15 @@ func NewClient(cfg *Config, logger *slog.Logger) (*client.Client, context.Contex
 	}
 	ctx := context.Background()
 	return cl, ctx, nil
+}
+
+func NewClientOrExit(cfg *Config, logger *slog.Logger) (*client.Client, context.Context) {
+	cl, ctx, err := NewClient(cfg, logger)
+	if err != nil {
+		logger.Error("failed to create client", "error", err)
+		os.Exit(1)
+	}
+	return cl, ctx
 }
 
 func ListStreams(cfg *Config, logger *slog.Logger) (streams []*client.StreamInfo, err error) {
